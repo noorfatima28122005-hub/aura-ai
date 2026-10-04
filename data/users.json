@@ -1,0 +1,38 @@
+[
+  {
+    "id": "usr_workingbynoor_gmail_com",
+    "email": "workingbynoor@gmail.com",
+    "salt": "b6174eca50fc106760081b649af3caaf",
+    "passwordHash": "76248ac99577958ce3a30570eb7a8309c8712ac9d6af0cee8cf9bdbab6eb417ba4235157a2ae4af1b3842e49cde1803bad07c3071927bc0376726d320480dc80",
+    "name": "Noor A.",
+    "companyName": "Aura Studio Operations",
+    "role": "Managing Director & Founder",
+    "businessDomain": "Digital Solutions & Consulting",
+    "teamSize": "1-5 specialists",
+    "primaryServices": [
+      "AI Strategy & Development",
+      "Web & UI/UX Systems"
+    ],
+    "averageProjectValue": "$2,500 - $10,000",
+    "aiAssistanceLevel": "autonomous_with_approval",
+    "createdAt": "2026-09-13T06:58:20.428Z"
+  },
+  {
+    "id": "usr_rayan_aurastudio_io",
+    "email": "rayan@aurastudio.io",
+    "salt": "1eff9abac1f4e4f55e33ff861c5afd6a",
+    "passwordHash": "386752e9fd7b4403052f24187495bb4a6561508072f4efa91238f85a8661fe7bc4fa5118b2a1a0e067bc89008db0cb5d766ac6792769a1150e4bdbf17d76f243",
+    "name": "Rayan Ahmed",
+    "companyName": "Aura Studio & Agency",
+    "role": "Founder & Principal",
+    "businessDomain": "Design & Software Engineering",
+    "teamSize": "1-5 specialists",
+    "primaryServices": [
+      "AI Operating Systems",
+      "Enterprise UX Architecture"
+    ],
+    "averageProjectValue": "$5,000 - $15,000",
+    "aiAssistanceLevel": "autonomous_with_approval",
+    "createdAt": "2026-09-13T06:58:20.456Z"
+  }
+]

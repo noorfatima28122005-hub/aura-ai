@@ -1,0 +1,9 @@
+{
+  "name": "AURA AI",
+  "description": "Intelligent Business Operating Workspace combining business management, AI intelligence, workflow automation, connected accounts, and human approval.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

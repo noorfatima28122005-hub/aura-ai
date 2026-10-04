@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and workspace settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "Display name" },
+        "photoURL": { "type": "string", "description": "Avatar photo URL" },
+        "companyName": { "type": "string", "description": "Company or brand name" },
+        "role": { "type": "string", "description": "User business role" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Workspace client record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "company": { "type": "string" },
+        "status": { "type": "string" },
+        "revenue": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Workspace project deliverable",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "progress": { "type": "number" },
+        "deadline": { "type": "string" },
+        "budget": { "type": "number" }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Actionable milestone or task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "deadline": { "type": "string" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Billing record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "clientName": { "type": "string" },
+        "amount": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "userId", "invoiceNumber", "amount"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Chat log item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "role": { "type": "string" },
+        "content": { "type": "string" },
+        "model": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "role", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document"
+    },
+    "/users/{userId}/clients/{clientId}": {
+      "schema": "Client",
+      "description": "User workspace clients"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User workspace projects"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User workspace tasks"
+    },
+    "/users/{userId}/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "User workspace invoices"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "ChatMessage",
+      "description": "User Gemini chatbot conversation threads"
+    }
+  }
+}
