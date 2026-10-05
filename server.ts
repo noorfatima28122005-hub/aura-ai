@@ -7,11 +7,24 @@ import {
   authenticateWithPassword,
   registerUser,
   createOrUpdateGoogleUser,
+  findUserWithVerifiedPassword,
   toPublicUser,
   getUserByToken,
   revokeSession,
   createSession,
 } from './server/auth';
+import {
+  authenticateFirebaseGoogle,
+  authenticateFirebaseBearer,
+  authenticateFirebaseIdToken,
+  authenticateFirebasePassword,
+  createFirebaseDemoSession,
+  getFirebaseGoogleClientId,
+  getFirebaseUserId,
+  migrateLegacyFirebaseUser,
+  registerFirebaseUser,
+  revokeFirebaseToken,
+} from './server/firebaseAuth';
 import {
   getUserWorkspace,
   saveUserWorkspace,
@@ -71,8 +84,7 @@ export function createApp() {
 
   // Google OAuth Config check
   app.get('/api/auth/config', (req, res) => {
-    const googleClientId =
-      process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
+    const googleClientId = getFirebaseGoogleClientId();
     res.json({
       googleClientId,
       configured: Boolean(googleClientId),
@@ -82,13 +94,26 @@ export function createApp() {
   });
 
   // Password Login
-  app.post('/api/auth/login', (req, res) => {
+  app.post('/api/auth/login', async (req, res) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
         res
           .status(400)
           .json({ error: 'Please enter both email address and password.' });
+        return;
+      }
+      if (process.env.VERCEL === '1') {
+        let result;
+        try {
+          result = await authenticateFirebasePassword(email, password);
+        } catch (err) {
+          const legacyUser = findUserWithVerifiedPassword(email, password);
+          if (!legacyUser) throw err;
+          result = await migrateLegacyFirebaseUser(legacyUser, password);
+        }
+        const { user, token } = result;
+        res.json({ success: true, user, token, message: 'Welcome back!' });
         return;
       }
       const { user, token } = authenticateWithPassword(email, password);
@@ -106,7 +131,7 @@ export function createApp() {
   });
 
   // 5-Step Signup Registration
-  app.post('/api/auth/signup', (req, res) => {
+  app.post('/api/auth/signup', async (req, res) => {
     try {
       const {
         email,
@@ -129,6 +154,23 @@ export function createApp() {
         res
           .status(400)
           .json({ error: 'Password must be at least 6 characters.' });
+        return;
+      }
+
+      if (process.env.VERCEL === '1') {
+        const { user, token } = await registerFirebaseUser({
+          email,
+          password,
+          name,
+          companyName,
+          role,
+          businessDomain,
+          teamSize,
+          primaryServices,
+          averageProjectValue,
+          aiAssistanceLevel,
+        });
+        res.json({ success: true, user, token, message: 'Account created successfully!' });
         return;
       }
 
@@ -162,8 +204,30 @@ export function createApp() {
   app.post('/api/auth/google', async (req, res) => {
     try {
       const { credential, email, name, picture } = req.body;
-      const googleClientId =
-        process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+      const googleClientId = getFirebaseGoogleClientId();
+
+      if (process.env.VERCEL === '1') {
+        const { firebaseIdToken, firebaseRefreshToken } = req.body;
+        const result = firebaseIdToken && firebaseRefreshToken
+          ? await authenticateFirebaseIdToken(firebaseIdToken, firebaseRefreshToken)
+          : credential
+            ? await authenticateFirebaseGoogle(
+                credential,
+                req.get('origin') || `${req.protocol}://${req.get('host')}`,
+              )
+            : null;
+        if (!result) {
+          res.status(401).json({ error: 'A verified Google credential is required.' });
+          return;
+        }
+        res.json({
+          success: true,
+          ...result,
+          message: 'Authenticated with Google!',
+          mode: 'firebase_google',
+        });
+        return;
+      }
 
       // 1. If an actual Google credential token is provided from GIS, verify with Google
       if (credential) {
@@ -224,7 +288,7 @@ export function createApp() {
   });
 
   // Current session inspection
-  app.get('/api/auth/me', (req, res) => {
+  app.get('/api/auth/me', async (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7)
@@ -234,6 +298,16 @@ export function createApp() {
       res
         .status(401)
         .json({ authenticated: false, error: 'No authorization token provided.' });
+      return;
+    }
+
+    if (process.env.VERCEL === '1') {
+      try {
+        const { user, token: refreshedToken } = await authenticateFirebaseBearer(token);
+        res.json({ authenticated: true, user, token: refreshedToken });
+      } catch (err: any) {
+        res.status(401).json({ authenticated: false, error: err.message || 'Session expired or invalid.' });
+      }
       return;
     }
 
@@ -252,22 +326,36 @@ export function createApp() {
   });
 
   // Logout session invalidation
-  app.post('/api/auth/logout', (req, res) => {
+  app.post('/api/auth/logout', async (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7)
       : null;
 
     if (token) {
-      revokeSession(token);
+      if (process.env.VERCEL === '1') {
+        try {
+          await revokeFirebaseToken(token);
+        } catch (err: any) {
+          res.status(500).json({ error: err.message || 'Could not revoke this session.' });
+          return;
+        }
+      } else {
+        revokeSession(token);
+      }
     }
 
     res.json({ success: true, message: 'Signed out successfully.' });
   });
 
   // Demo session token generator
-  app.post('/api/auth/demo', (req, res) => {
+  app.post('/api/auth/demo', async (req, res) => {
     try {
+      if (process.env.VERCEL === '1') {
+        const { user, token } = await createFirebaseDemoSession();
+        res.json({ success: true, user, token });
+        return;
+      }
       const token = createSession('usr_workingbynoor_gmail_com');
       const user = getUserByToken(token);
       res.json({
@@ -293,6 +381,25 @@ export function createApp() {
     // Fallback to default user id if in dev or guest
     return (req.headers['x-user-id'] as string) || 'usr_workingbynoor_gmail_com';
   }
+
+  app.use('/api', async (req, res, next) => {
+    if (process.env.VERCEL !== '1') {
+      next();
+      return;
+    }
+    const authorization = req.headers.authorization;
+    const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+    if (!token) {
+      next();
+      return;
+    }
+    try {
+      req.headers['x-user-id'] = await getFirebaseUserId(token);
+      next();
+    } catch (err: any) {
+      res.status(401).json({ error: err.message || 'Session expired or invalid.' });
+    }
+  });
 
   // ==========================================
   // WORKSPACE API ENDPOINTS

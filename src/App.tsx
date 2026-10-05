@@ -176,6 +176,7 @@ export default function App() {
           if (data?.user) {
             setUser(data.user);
             localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(data.user));
+            if (data.token) localStorage.setItem('aura_auth_token', data.token);
           }
         })
         .catch(() => {

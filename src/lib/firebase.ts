@@ -44,6 +44,7 @@ export async function signInWithGoogleFirebase(): Promise<{
   displayName: string;
   photoURL: string;
   idToken: string;
+  refreshToken: string;
 }> {
   const result = await signInWithPopup(auth, googleProvider);
   const user = result.user;
@@ -57,6 +58,7 @@ export async function signInWithGoogleFirebase(): Promise<{
       user.photoURL ||
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
     idToken,
+    refreshToken: user.refreshToken,
   };
 }
 

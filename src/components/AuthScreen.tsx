@@ -215,6 +215,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               name: fbResult.displayName || fbResult.email.split('@')[0],
               picture: fbResult.photoURL || '',
               firebaseUid: fbResult.uid,
+              firebaseIdToken: fbResult.idToken,
+              firebaseRefreshToken: fbResult.refreshToken,
             }),
           });
           const authData = await authRes.json();

@@ -167,6 +167,18 @@ export function findUserByEmail(email: string): AuthUser | undefined {
   return usersCache.get(email.toLowerCase());
 }
 
+export function findUserWithVerifiedPassword(email: string, password: string): AuthUser | undefined {
+  const user = findUserByEmail(email.trim());
+  if (!user) return undefined;
+
+  const actualHash = Buffer.from(hashPassword(password, user.salt), 'hex');
+  const expectedHash = Buffer.from(user.passwordHash, 'hex');
+  if (actualHash.length !== expectedHash.length || !crypto.timingSafeEqual(actualHash, expectedHash)) {
+    return undefined;
+  }
+  return user;
+}
+
 export function registerUser(params: {
   email: string;
   password: string;
