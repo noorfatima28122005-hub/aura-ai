@@ -1,5 +1,5 @@
-```ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
+
 import {
   getAuth,
   GoogleAuthProvider,
@@ -8,6 +8,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
+
 import {
   getFirestore,
   doc,
@@ -54,8 +55,6 @@ googleProvider.setCustomParameters({
 
 /**
  * Sign in with Google using Firebase Authentication.
- *
- * Returns the Firebase user information and ID token.
  */
 export async function signInWithGoogleFirebase(): Promise<{
   uid: string;
@@ -66,7 +65,10 @@ export async function signInWithGoogleFirebase(): Promise<{
   refreshToken: string;
 }> {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(
+      auth,
+      googleProvider
+    );
 
     const user = result.user;
 
@@ -81,10 +83,14 @@ export async function signInWithGoogleFirebase(): Promise<{
       refreshToken: user.refreshToken,
     };
   } catch (error: any) {
-    console.error('Firebase Google sign-in failed:', error);
+    console.error(
+      'Firebase Google sign-in failed:',
+      error
+    );
 
     throw new Error(
-      error?.message || 'Google authentication failed. Please try again.'
+      error?.message ||
+        'Google authentication failed. Please try again.'
     );
   }
 }
@@ -96,7 +102,11 @@ export async function signOutFirebase(): Promise<void> {
   try {
     await signOut(auth);
   } catch (error) {
-    console.error('Firebase sign-out failed:', error);
+    console.error(
+      'Firebase sign-out failed:',
+      error
+    );
+
     throw error;
   }
 }
@@ -114,12 +124,11 @@ export function onFirebaseAuthStateChanged(
    FIRESTORE
    ========================================================= */
 
-/**
- * Use the configured Firestore database when a database ID
- * exists. Otherwise use the default Firestore database.
- */
 export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  ? getFirestore(
+      app,
+      firebaseConfig.firestoreDatabaseId
+    )
   : getFirestore(app);
 
 /* =========================================================
@@ -135,26 +144,34 @@ export async function saveWorkspaceToFirestore(
   profile?: UserProfile
 ): Promise<boolean> {
   if (!userId) {
-    console.warn('saveWorkspaceToFirestore: missing userId');
+    console.warn(
+      'saveWorkspaceToFirestore: missing userId'
+    );
+
     return false;
   }
 
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(
+      db,
+      'users',
+      userId
+    );
 
     await setDoc(
       userDocRef,
       {
         uid: userId,
         email: profile?.email || '',
-        displayName: profile?.name || 'Workspace Owner',
+        displayName:
+          profile?.name || 'Workspace Owner',
         companyName:
-          profile?.companyName || 'AURA AI Workspace',
+          profile?.companyName ||
+          'AURA AI Workspace',
         role:
-          profile?.role || 'Founder & Principal Consultant',
-
+          profile?.role ||
+          'Founder & Principal Consultant',
         stats: data.stats || null,
-
         updatedAt: new Date().toISOString(),
         syncedAt: serverTimestamp(),
       },
@@ -184,7 +201,8 @@ export async function saveWorkspaceToFirestore(
           {
             ...client,
             userId,
-            updatedAt: new Date().toISOString(),
+            updatedAt:
+              new Date().toISOString(),
           },
           {
             merge: true,
@@ -214,7 +232,8 @@ export async function saveWorkspaceToFirestore(
           {
             ...project,
             userId,
-            updatedAt: new Date().toISOString(),
+            updatedAt:
+              new Date().toISOString(),
           },
           {
             merge: true,
@@ -244,7 +263,8 @@ export async function saveWorkspaceToFirestore(
           {
             ...task,
             userId,
-            updatedAt: new Date().toISOString(),
+            updatedAt:
+              new Date().toISOString(),
           },
           {
             merge: true,
@@ -274,7 +294,8 @@ export async function saveWorkspaceToFirestore(
           {
             ...invoice,
             userId,
-            updatedAt: new Date().toISOString(),
+            updatedAt:
+              new Date().toISOString(),
           },
           {
             merge: true,
@@ -352,32 +373,55 @@ export async function loadWorkspaceFromFirestore(
     const clients: Client[] = [];
 
     clientsSnap.forEach((snapshot) => {
-      clients.push(snapshot.data() as Client);
+      clients.push(
+        snapshot.data() as Client
+      );
     });
 
     const projects: Project[] = [];
 
     projectsSnap.forEach((snapshot) => {
-      projects.push(snapshot.data() as Project);
+      projects.push(
+        snapshot.data() as Project
+      );
     });
 
     const tasks: Task[] = [];
 
     tasksSnap.forEach((snapshot) => {
-      tasks.push(snapshot.data() as Task);
+      tasks.push(
+        snapshot.data() as Task
+      );
     });
 
     const invoices: Invoice[] = [];
 
     invoicesSnap.forEach((snapshot) => {
-      invoices.push(snapshot.data() as Invoice);
+      invoices.push(
+        snapshot.data() as Invoice
+      );
     });
 
     return {
-      clients: clients.length ? clients : undefined,
-      projects: projects.length ? projects : undefined,
-      tasks: tasks.length ? tasks : undefined,
-      invoices: invoices.length ? invoices : undefined,
+      clients:
+        clients.length > 0
+          ? clients
+          : undefined,
+
+      projects:
+        projects.length > 0
+          ? projects
+          : undefined,
+
+      tasks:
+        tasks.length > 0
+          ? tasks
+          : undefined,
+
+      invoices:
+        invoices.length > 0
+          ? invoices
+          : undefined,
     };
   } catch (error) {
     console.error(
@@ -422,11 +466,8 @@ export async function saveChatMessageToFirestore(
 
     await setDoc(chatDocRef, {
       ...message,
-
       userId,
-
       createdAt: serverTimestamp(),
-
       isoTime:
         message.timestamp ||
         new Date().toISOString(),
@@ -467,7 +508,8 @@ export async function loadChatMessagesFromFirestore(
       limit(50)
     );
 
-    const snapshot = await getDocs(chatsQuery);
+    const snapshot =
+      await getDocs(chatsQuery);
 
     const messages: any[] = [];
 
@@ -520,8 +562,10 @@ export async function saveVoicePreferencesToFirestore(
           speed: prefs.speed,
           volume: prefs.volume,
           isMuted: prefs.isMuted,
-          language: prefs.language || 'en-US',
-          updatedAt: new Date().toISOString(),
+          language:
+            prefs.language || 'en-US',
+          updatedAt:
+            new Date().toISOString(),
         },
       },
       {
@@ -562,14 +606,16 @@ export async function loadVoicePreferencesFromFirestore(
       userId
     );
 
-    const snapshot = await getDoc(userDocRef);
+    const snapshot =
+      await getDoc(userDocRef);
 
     if (!snapshot.exists()) {
       return null;
     }
 
     return (
-      snapshot.data()?.voicePreferences || null
+      snapshot.data()?.voicePreferences ||
+      null
     );
   } catch (error) {
     console.error(
@@ -580,18 +626,3 @@ export async function loadVoicePreferencesFromFirestore(
     return null;
   }
 }
-```
-
-**Important:** is code mein maine tumhari original Firebase config ko preserve kiya hai aur Google authentication ko proper error handling ke saath rakha hai.
-
-Ab file **Save** karo, phir PowerShell mein:
-
-```powershell
-git add src/lib/firebase.ts
-git commit -m "Fix Firebase authentication and Firestore integration"
-git push origin main
-```
-
-Phir Vercel automatically naya deployment karega.
-
-**Lekin ek important baat:** agar deployment ke baad bhi `Authenticating with Google via Firebase Auth...` par stuck hota hai, to sirf `firebase.ts` change karne se problem solve nahi hogi. Phir humein **Firebase Console → Authentication → Sign-in method → Google** aur **Authorized domains** check karne honge.
