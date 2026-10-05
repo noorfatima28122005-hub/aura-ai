@@ -1,3 +1,4 @@
+```ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
@@ -19,24 +20,42 @@ import {
   limit,
   serverTimestamp,
 } from 'firebase/firestore';
+
 import firebaseConfig from '../../firebase-applet-config.json';
-import { WorkspaceData, Client, Project, Task, Invoice, UserProfile } from '../types';
 
-// Initialize Firebase App instance
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+import {
+  WorkspaceData,
+  Client,
+  Project,
+  Task,
+  Invoice,
+  UserProfile,
+} from '../types';
 
-// Initialize Auth & Firestore
+/* =========================================================
+   FIREBASE INITIALIZATION
+   ========================================================= */
+
+const app = !getApps().length
+  ? initializeApp(firebaseConfig)
+  : getApp();
+
+/* =========================================================
+   FIREBASE AUTHENTICATION
+   ========================================================= */
+
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Use dedicated firestoreDatabaseId if configured, or default
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+export const googleProvider = new GoogleAuthProvider();
+
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 /**
- * Sign in using Firebase Google Auth popup
+ * Sign in with Google using Firebase Authentication.
+ *
+ * Returns the Firebase user information and ID token.
  */
 export async function signInWithGoogleFirebase(): Promise<{
   uid: string;
@@ -46,156 +65,336 @@ export async function signInWithGoogleFirebase(): Promise<{
   idToken: string;
   refreshToken: string;
 }> {
-  const result = await signInWithPopup(auth, googleProvider);
-  const user = result.user;
-  const idToken = await user.getIdToken();
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
 
-  return {
-    uid: user.uid,
-    email: user.email || 'workingbynoor@gmail.com',
-    displayName: user.displayName || 'Noor A.',
-    photoURL:
-      user.photoURL ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    idToken,
-    refreshToken: user.refreshToken,
-  };
+    const user = result.user;
+
+    const idToken = await user.getIdToken();
+
+    return {
+      uid: user.uid,
+      email: user.email || '',
+      displayName: user.displayName || 'Noor',
+      photoURL: user.photoURL || '',
+      idToken,
+      refreshToken: user.refreshToken,
+    };
+  } catch (error: any) {
+    console.error('Firebase Google sign-in failed:', error);
+
+    throw new Error(
+      error?.message || 'Google authentication failed. Please try again.'
+    );
+  }
 }
 
 /**
- * Sign out of Firebase Auth
+ * Sign out the current Firebase user.
  */
 export async function signOutFirebase(): Promise<void> {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error('Firebase sign-out failed:', error);
+    throw error;
+  }
 }
 
 /**
- * Save user profile and full workspace data to Firestore
+ * Listen for Firebase authentication state changes.
+ */
+export function onFirebaseAuthStateChanged(
+  callback: (user: FirebaseUser | null) => void
+): () => void {
+  return onAuthStateChanged(auth, callback);
+}
+
+/* =========================================================
+   FIRESTORE
+   ========================================================= */
+
+/**
+ * Use the configured Firestore database when a database ID
+ * exists. Otherwise use the default Firestore database.
+ */
+export const db = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
+
+/* =========================================================
+   USER PROFILE + WORKSPACE
+   ========================================================= */
+
+/**
+ * Save user profile and workspace information.
  */
 export async function saveWorkspaceToFirestore(
   userId: string,
   data: WorkspaceData,
   profile?: UserProfile
 ): Promise<boolean> {
-  if (!userId) return false;
+  if (!userId) {
+    console.warn('saveWorkspaceToFirestore: missing userId');
+    return false;
+  }
+
   try {
     const userDocRef = doc(db, 'users', userId);
+
     await setDoc(
       userDocRef,
       {
         uid: userId,
-        email: profile?.email || 'workingbynoor@gmail.com',
+        email: profile?.email || '',
         displayName: profile?.name || 'Workspace Owner',
-        companyName: profile?.companyName || 'Apex Strategic Studio',
-        role: profile?.role || 'Founder & Principal Consultant',
+        companyName:
+          profile?.companyName || 'AURA AI Workspace',
+        role:
+          profile?.role || 'Founder & Principal Consultant',
+
         stats: data.stats || null,
+
         updatedAt: new Date().toISOString(),
         syncedAt: serverTimestamp(),
       },
-      { merge: true }
+      {
+        merge: true,
+      }
     );
 
-    // Save active clients batch/documents
-    if (data.clients && data.clients.length > 0) {
+    /* -----------------------------------------------------
+       CLIENTS
+       ----------------------------------------------------- */
+
+    if (data.clients?.length) {
       for (const client of data.clients) {
-        if (client.id) {
-          const clientRef = doc(db, 'users', userId, 'clients', client.id);
-          await setDoc(clientRef, { ...client, userId, updatedAt: new Date().toISOString() }, { merge: true });
-        }
+        if (!client.id) continue;
+
+        const clientRef = doc(
+          db,
+          'users',
+          userId,
+          'clients',
+          client.id
+        );
+
+        await setDoc(
+          clientRef,
+          {
+            ...client,
+            userId,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            merge: true,
+          }
+        );
       }
     }
 
-    // Save active projects
-    if (data.projects && data.projects.length > 0) {
+    /* -----------------------------------------------------
+       PROJECTS
+       ----------------------------------------------------- */
+
+    if (data.projects?.length) {
       for (const project of data.projects) {
-        if (project.id) {
-          const projectRef = doc(db, 'users', userId, 'projects', project.id);
-          await setDoc(projectRef, { ...project, userId, updatedAt: new Date().toISOString() }, { merge: true });
-        }
+        if (!project.id) continue;
+
+        const projectRef = doc(
+          db,
+          'users',
+          userId,
+          'projects',
+          project.id
+        );
+
+        await setDoc(
+          projectRef,
+          {
+            ...project,
+            userId,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            merge: true,
+          }
+        );
       }
     }
 
-    // Save active tasks
-    if (data.tasks && data.tasks.length > 0) {
+    /* -----------------------------------------------------
+       TASKS
+       ----------------------------------------------------- */
+
+    if (data.tasks?.length) {
       for (const task of data.tasks) {
-        if (task.id) {
-          const taskRef = doc(db, 'users', userId, 'tasks', task.id);
-          await setDoc(taskRef, { ...task, userId, updatedAt: new Date().toISOString() }, { merge: true });
-        }
+        if (!task.id) continue;
+
+        const taskRef = doc(
+          db,
+          'users',
+          userId,
+          'tasks',
+          task.id
+        );
+
+        await setDoc(
+          taskRef,
+          {
+            ...task,
+            userId,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            merge: true,
+          }
+        );
       }
     }
 
-    // Save invoices
-    if (data.invoices && data.invoices.length > 0) {
-      for (const inv of data.invoices) {
-        if (inv.id) {
-          const invRef = doc(db, 'users', userId, 'invoices', inv.id);
-          await setDoc(invRef, { ...inv, userId, updatedAt: new Date().toISOString() }, { merge: true });
-        }
+    /* -----------------------------------------------------
+       INVOICES
+       ----------------------------------------------------- */
+
+    if (data.invoices?.length) {
+      for (const invoice of data.invoices) {
+        if (!invoice.id) continue;
+
+        const invoiceRef = doc(
+          db,
+          'users',
+          userId,
+          'invoices',
+          invoice.id
+        );
+
+        await setDoc(
+          invoiceRef,
+          {
+            ...invoice,
+            userId,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            merge: true,
+          }
+        );
       }
     }
 
     return true;
-  } catch (err) {
-    console.warn('Firestore persistence warning:', err);
+  } catch (error) {
+    console.error(
+      'Firestore workspace persistence failed:',
+      error
+    );
+
     return false;
   }
 }
 
+/* =========================================================
+   LOAD WORKSPACE
+   ========================================================= */
+
 /**
- * Load workspace records from Firestore
+ * Load workspace data for the authenticated user.
  */
 export async function loadWorkspaceFromFirestore(
   userId: string
 ): Promise<Partial<WorkspaceData> | null> {
-  if (!userId) return null;
-  try {
-    const clientsRef = collection(db, 'users', userId, 'clients');
-    const projectsRef = collection(db, 'users', userId, 'projects');
-    const tasksRef = collection(db, 'users', userId, 'tasks');
-    const invoicesRef = collection(db, 'users', userId, 'invoices');
+  if (!userId) {
+    return null;
+  }
 
-    const [clientsSnap, projectsSnap, tasksSnap, invoicesSnap] = await Promise.all([
-      getDocs(clientsRef).catch(() => null),
-      getDocs(projectsRef).catch(() => null),
-      getDocs(tasksRef).catch(() => null),
-      getDocs(invoicesRef).catch(() => null),
+  try {
+    const clientsRef = collection(
+      db,
+      'users',
+      userId,
+      'clients'
+    );
+
+    const projectsRef = collection(
+      db,
+      'users',
+      userId,
+      'projects'
+    );
+
+    const tasksRef = collection(
+      db,
+      'users',
+      userId,
+      'tasks'
+    );
+
+    const invoicesRef = collection(
+      db,
+      'users',
+      userId,
+      'invoices'
+    );
+
+    const [
+      clientsSnap,
+      projectsSnap,
+      tasksSnap,
+      invoicesSnap,
+    ] = await Promise.all([
+      getDocs(clientsRef),
+      getDocs(projectsRef),
+      getDocs(tasksRef),
+      getDocs(invoicesRef),
     ]);
 
     const clients: Client[] = [];
-    if (clientsSnap) {
-      clientsSnap.forEach((d) => clients.push(d.data() as Client));
-    }
+
+    clientsSnap.forEach((snapshot) => {
+      clients.push(snapshot.data() as Client);
+    });
 
     const projects: Project[] = [];
-    if (projectsSnap) {
-      projectsSnap.forEach((d) => projects.push(d.data() as Project));
-    }
+
+    projectsSnap.forEach((snapshot) => {
+      projects.push(snapshot.data() as Project);
+    });
 
     const tasks: Task[] = [];
-    if (tasksSnap) {
-      tasksSnap.forEach((d) => tasks.push(d.data() as Task));
-    }
+
+    tasksSnap.forEach((snapshot) => {
+      tasks.push(snapshot.data() as Task);
+    });
 
     const invoices: Invoice[] = [];
-    if (invoicesSnap) {
-      invoicesSnap.forEach((d) => invoices.push(d.data() as Invoice));
-    }
+
+    invoicesSnap.forEach((snapshot) => {
+      invoices.push(snapshot.data() as Invoice);
+    });
 
     return {
-      clients: clients.length > 0 ? clients : undefined,
-      projects: projects.length > 0 ? projects : undefined,
-      tasks: tasks.length > 0 ? tasks : undefined,
-      invoices: invoices.length > 0 ? invoices : undefined,
+      clients: clients.length ? clients : undefined,
+      projects: projects.length ? projects : undefined,
+      tasks: tasks.length ? tasks : undefined,
+      invoices: invoices.length ? invoices : undefined,
     };
-  } catch (err) {
-    console.warn('Failed to load from Firestore:', err);
+  } catch (error) {
+    console.error(
+      'Failed to load workspace from Firestore:',
+      error
+    );
+
     return null;
   }
 }
 
+/* =========================================================
+   CHAT
+   ========================================================= */
+
 /**
- * Save chat message to Firestore chat collection
+ * Save an AURA chat message.
  */
 export async function saveChatMessageToFirestore(
   userId: string,
@@ -208,50 +407,112 @@ export async function saveChatMessageToFirestore(
     groundingSources?: any[];
   }
 ): Promise<boolean> {
-  if (!userId) return false;
+  if (!userId || !message.id) {
+    return false;
+  }
+
   try {
-    const chatDocRef = doc(db, 'users', userId, 'chats', message.id);
+    const chatDocRef = doc(
+      db,
+      'users',
+      userId,
+      'chats',
+      message.id
+    );
+
     await setDoc(chatDocRef, {
       ...message,
+
       userId,
+
       createdAt: serverTimestamp(),
-      isoTime: message.timestamp || new Date().toISOString(),
+
+      isoTime:
+        message.timestamp ||
+        new Date().toISOString(),
     });
+
     return true;
-  } catch (err) {
-    console.warn('Could not save chat message to Firestore:', err);
+  } catch (error) {
+    console.error(
+      'Could not save chat message:',
+      error
+    );
+
     return false;
   }
 }
 
 /**
- * Load recent chat messages from Firestore
+ * Load recent AURA chat messages.
  */
-export async function loadChatMessagesFromFirestore(userId: string): Promise<any[]> {
-  if (!userId) return [];
+export async function loadChatMessagesFromFirestore(
+  userId: string
+): Promise<any[]> {
+  if (!userId) {
+    return [];
+  }
+
   try {
-    const chatsRef = collection(db, 'users', userId, 'chats');
-    const q = query(chatsRef, limit(50));
-    const snap = await getDocs(q);
+    const chatsRef = collection(
+      db,
+      'users',
+      userId,
+      'chats'
+    );
+
+    const chatsQuery = query(
+      chatsRef,
+      orderBy('isoTime', 'desc'),
+      limit(50)
+    );
+
+    const snapshot = await getDocs(chatsQuery);
+
     const messages: any[] = [];
-    snap.forEach((d) => messages.push(d.data()));
-    return messages.sort((a, b) => (a.isoTime || '').localeCompare(b.isoTime || ''));
-  } catch (err) {
-    console.warn('Could not load chat messages from Firestore:', err);
+
+    snapshot.forEach((item) => {
+      messages.push(item.data());
+    });
+
+    return messages.reverse();
+  } catch (error) {
+    console.error(
+      'Could not load chat messages:',
+      error
+    );
+
     return [];
   }
 }
 
+/* =========================================================
+   VOICE PREFERENCES
+   ========================================================= */
+
 /**
- * Persist user voice speed and volume preferences to Firestore
+ * Save AURA voice preferences.
  */
 export async function saveVoicePreferencesToFirestore(
   userId: string,
-  prefs: { speed: number; volume: number; isMuted: boolean; language?: string }
+  prefs: {
+    speed: number;
+    volume: number;
+    isMuted: boolean;
+    language?: string;
+  }
 ): Promise<boolean> {
-  if (!userId) return false;
+  if (!userId) {
+    return false;
+  }
+
   try {
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(
+      db,
+      'users',
+      userId
+    );
+
     await setDoc(
       userDocRef,
       {
@@ -263,32 +524,74 @@ export async function saveVoicePreferencesToFirestore(
           updatedAt: new Date().toISOString(),
         },
       },
-      { merge: true }
+      {
+        merge: true,
+      }
     );
+
     return true;
-  } catch (err) {
-    console.warn('Could not save voice preferences to Firestore:', err);
+  } catch (error) {
+    console.error(
+      'Could not save voice preferences:',
+      error
+    );
+
     return false;
   }
 }
 
 /**
- * Retrieve user voice speed and volume preferences from Firestore
+ * Load AURA voice preferences.
  */
 export async function loadVoicePreferencesFromFirestore(
   userId: string
-): Promise<{ speed?: number; volume?: number; isMuted?: boolean; language?: string } | null> {
-  if (!userId) return null;
-  try {
-    const userDocRef = doc(db, 'users', userId);
-    const snap = await getDoc(userDocRef);
-    if (snap.exists()) {
-      return snap.data()?.voicePreferences || null;
-    }
+): Promise<{
+  speed?: number;
+  volume?: number;
+  isMuted?: boolean;
+  language?: string;
+} | null> {
+  if (!userId) {
     return null;
-  } catch (err) {
-    console.warn('Could not load voice preferences from Firestore:', err);
+  }
+
+  try {
+    const userDocRef = doc(
+      db,
+      'users',
+      userId
+    );
+
+    const snapshot = await getDoc(userDocRef);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    return (
+      snapshot.data()?.voicePreferences || null
+    );
+  } catch (error) {
+    console.error(
+      'Could not load voice preferences:',
+      error
+    );
+
     return null;
   }
 }
+```
 
+**Important:** is code mein maine tumhari original Firebase config ko preserve kiya hai aur Google authentication ko proper error handling ke saath rakha hai.
+
+Ab file **Save** karo, phir PowerShell mein:
+
+```powershell
+git add src/lib/firebase.ts
+git commit -m "Fix Firebase authentication and Firestore integration"
+git push origin main
+```
+
+Phir Vercel automatically naya deployment karega.
+
+**Lekin ek important baat:** agar deployment ke baad bhi `Authenticating with Google via Firebase Auth...` par stuck hota hai, to sirf `firebase.ts` change karne se problem solve nahi hogi. Phir humein **Firebase Console → Authentication → Sign-in method → Google** aur **Authorized domains** check karne honge.
