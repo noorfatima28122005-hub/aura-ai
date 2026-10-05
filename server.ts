@@ -42,9 +42,8 @@ import {
 
 dotenv.config();
 
-async function startServer() {
+export function createApp() {
   const app = express();
-  const PORT = 3000;
 
   app.use(express.json());
 
@@ -1436,6 +1435,13 @@ ${JSON.stringify(workspaceContext || {}, null, 2)}`;
     }
   });
 
+  return app;
+}
+
+async function startServer() {
+  const app = createApp();
+  const PORT = 3000;
+
   // Vite middleware in dev; static assets in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -1456,4 +1462,6 @@ ${JSON.stringify(workspaceContext || {}, null, 2)}`;
   });
 }
 
-startServer();
+if (process.env.VERCEL !== '1') {
+  void startServer();
+}
